@@ -48,4 +48,14 @@ public class AgenticController {
     public String conditionalAgentApi(@RequestParam String message) {
         return service.conditionalAgent(message);
     }
+
+    @GetMapping("/translate")
+    public Object translateAgentApi(@RequestParam String topic, @RequestParam String language) {
+        return service.translatorAgent(topic, language);
+    }
+
+    @GetMapping("/streaming")
+    public String streamingAgentApi(@RequestParam String topic) {
+        return service.streaming(topic);
+    }
 }

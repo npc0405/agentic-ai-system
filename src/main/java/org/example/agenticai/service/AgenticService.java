@@ -4,6 +4,8 @@ import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.chat.response.ChatResponse;
+import dev.langchain4j.model.chat.response.StreamingChatResponseHandler;
 import org.example.agenticai.agents.Agents.*;
 import org.example.agenticai.util.Intent;
 import org.example.agenticai.util.Review;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -210,5 +213,55 @@ public class AgenticService {
                         "message", message
                 )
         );
+    }
+
+    public Object translatorAgent(String topic, String language) {
+        StoryWriter draft = AgenticServices.agentBuilder(StoryWriter.class)
+                .chatModel(model)
+                .outputKey("story")
+                .build();
+
+        Translator translator = AgenticServices.agentBuilder(Translator.class)
+                .chatModel(model)
+                .outputKey("languageConverted")
+                .optional(true)
+                .build();
+
+        FactChecker factChecker = AgenticServices.agentBuilder(FactChecker.class)
+                .chatModel(model)
+                .outputKey("factNote")
+                .async(true).build();
+
+        UntypedAgent pipeline = AgenticServices.sequenceBuilder()
+                .subAgents(draft, translator, factChecker)
+                .outputKey("story")
+                .build();
+
+        return pipeline.invoke((Map.of("topic", topic, "language", language)));
+
+    }
+
+    public String streaming(String topic) {
+        StringBuilder assembled = new StringBuilder();
+        CompletableFuture<String> done = new CompletableFuture<>();
+        streamingChatModel.chat("Write a short story about " + topic + ".", new StreamingChatResponseHandler() {
+            @Override
+            public void onPartialResponse(String token) {
+                assembled.append(token);
+                System.out.println(token);
+            }
+
+            @Override
+            public void onCompleteResponse(ChatResponse completeResponse) {
+                done.complete(assembled.toString());
+            }
+
+            @Override
+            public void onError(Throwable error) {
+                done.completeExceptionally(error);
+            }
+        });
+
+        return done.join();
     }
 }

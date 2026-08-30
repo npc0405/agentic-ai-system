@@ -123,4 +123,16 @@ public class Agents {
         @Agent("Handles praise")
         String reply(@V("message") String message);
     }
+
+    public interface Translator {
+        @UserMessage("Translate this story: {{story}} to given language: {{language}}")
+        @Agent("Translates the text to given language")
+        String translate(@V("story") String story, @V("language") String language);
+    }
+
+    public interface FactChecker {
+        @UserMessage("List one fact worth double checking in this text: {{story}}")
+        @Agent("Checks facts in the background.")
+        String checkFacts(@V("story") String story);
+    }
 }

@@ -4,6 +4,7 @@ package org.example.agenticai.config;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.ollama.OllamaChatModel;
+import dev.langchain4j.model.ollama.OllamaStreamingChatModel;
 import dev.langchain4j.model.openai.OpenAiChatModel;
 import dev.langchain4j.model.openai.OpenAiStreamingChatModel;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,9 +46,18 @@ public class ModelConfig {
 
     @Bean
     public StreamingChatModel streamingChatModel() {
-        return OpenAiStreamingChatModel.builder()
-                .apiKey(apiKey)
-                .modelName(modelName)
+        return OllamaStreamingChatModel.builder()
+                .baseUrl(ollamaUrl)
+                .modelName(ollamaModel)
+                .timeout(Duration.ofMinutes(5))
                 .build();
     }
+
+//    @Bean
+//    public StreamingChatModel streamingChatModel() {
+//        return OpenAiStreamingChatModel.builder()
+//                .apiKey(apiKey)
+//                .modelName(modelName)
+//                .build();
+//    }
 }
