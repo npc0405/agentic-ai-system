@@ -58,4 +58,22 @@ public class AgenticController {
     public String streamingAgentApi(@RequestParam String topic) {
         return service.streaming(topic);
     }
+
+    @GetMapping("/error-recovery")
+    public String errorRecoveryAgentApi(@RequestParam String topic) {
+        // Not using the parameter topic intentionally to test error recovery.
+        return service.errorRecovery();
+    }
+
+    @GetMapping("/observability")
+    public Object observabilityAgentApi(@RequestParam String topic) {
+        return service.observability(topic);
+    }
+
+    @GetMapping("/human")
+    public String humanInTheLoopApi(@RequestParam String request, @RequestParam String humanDecision) {
+        return service.humanInTheLoop(request, humanDecision);
+    }
+
+
 }

@@ -135,4 +135,11 @@ public class Agents {
         @Agent("Checks facts in the background.")
         String checkFacts(@V("story") String story);
     }
+
+    public interface DecisionProposer{
+        @SystemMessage("You summarise a request and propose a decision in two short lines. ")
+        @UserMessage("Request: {{request}}")
+        @Agent("Proposes a decision for human to confirm")
+        String propose(String request);
+    }
 }

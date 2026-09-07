@@ -2,6 +2,12 @@ package org.example.agenticai.service;
 
 import dev.langchain4j.agentic.AgenticServices;
 import dev.langchain4j.agentic.UntypedAgent;
+import dev.langchain4j.agentic.agent.ErrorRecoveryResult;
+import dev.langchain4j.agentic.observability.AgentListener;
+import dev.langchain4j.agentic.observability.AgentRequest;
+import dev.langchain4j.agentic.observability.AgentResponse;
+import dev.langchain4j.agentic.scope.AgenticScope;
+import dev.langchain4j.agentic.workflow.HumanInTheLoop;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
 import dev.langchain4j.model.chat.response.ChatResponse;
@@ -16,7 +22,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 public class AgenticService {
@@ -25,6 +30,31 @@ public class AgenticService {
 
     @Autowired
     private StreamingChatModel streamingChatModel;
+
+
+    // Class level listener which can be attached to any method
+    AgentListener logger = new AgentListener() {
+        @Override
+        public void beforeAgentInvocation(AgentRequest agentRequest) {
+            // Runs before agent execution and print which agent is called with inputs provided.
+            System.out.println(">> calling agent " + agentRequest.agentName() + " with input " + agentRequest.inputs());
+        }
+
+        @Override
+        public void afterAgentInvocation(AgentResponse agentResponse) {
+            System.out.println("<< Exiting from agent " + agentResponse.agentName() + " with response " + agentResponse.output());
+        }
+
+        @Override
+        public void beforeAgenticScopeDestroyed(AgenticScope agenticScope) {
+            System.out.println(">> Agentic scope is getting destroyed, before. "+ agenticScope.readState("topic"));
+        }
+
+        @Override
+        public void afterAgenticScopeCreated(AgenticScope agenticScope) {
+            System.out.println(">> Agentic scope is getting created, after. "+ agenticScope.readState("topic"));
+        }
+    };
 
     public String basicAgent(String topic){
         StoryWriter writer = AgenticServices.agentBuilder(StoryWriter.class)
@@ -264,4 +294,67 @@ public class AgenticService {
 
         return done.join();
     }
+
+    public String errorRecovery() {
+        StoryWriter writer = AgenticServices.agentBuilder(StoryWriter.class)
+                .chatModel(model)
+                .outputKey("story")
+                .build();
+
+        UntypedAgent safeWriter = AgenticServices.sequenceBuilder().subAgents(writer)
+                .outputKey("story")
+                // Define what should happen if an agent execution fails.
+                .errorHandler(ctx -> {
+                    if (ctx.agenticScope().readState("topic") == null) {
+                        // Topic is missing, add a topic, so that storywriter has something to talk about
+                        ctx.agenticScope().writeState("topic", "Elephants in India.");
+                        // Retry failed operation again, so that agent do not fail with no topic provided.
+                        return ErrorRecoveryResult.retry();
+                    }
+                    // Any other problem than topic missing, then throw as is.
+                    return ErrorRecoveryResult.throwException();
+                }).build();
+
+        // intentionally invoking the storyWriter without topic
+        return safeWriter.invoke(Map.of()).toString();
+    }
+
+    public Object observability(String topic) {
+
+        StoryWriter writer = AgenticServices.agentBuilder(StoryWriter.class)
+                .chatModel(model)
+                .outputKey("story")
+                .listener(logger) // Attaching our listener logger to this agent.
+                .build();
+
+        // Writer is being called instead of invoke, as we are creating writer as an agentBuilder and not sequenceBuilder.
+//        return writer.write(topic);
+
+        UntypedAgent pipeline = AgenticServices.sequenceBuilder().subAgents(writer).outputKey("story").listener(logger).build();
+        return pipeline.invoke(Map.of("topic", topic));
+    }
+
+    public String humanInTheLoop(String request, String humanDecision) {
+
+        DecisionProposer proposer = AgenticServices
+                .agentBuilder(DecisionProposer.class)
+                .outputKey("proposal")
+                .chatModel(model)
+                .build();
+
+        HumanInTheLoop approval = AgenticServices.humanInTheLoopBuilder()
+                .description("A human approves or rejects the proposed decision")
+                .outputKey("finalDecision")
+                .responseProvider(agenticScope -> {
+                    System.out.println("Agent proposed: " + agenticScope.readState("proposal"));
+                    return humanDecision;
+                })
+                .listener(logger)
+                .build();
+
+        UntypedAgent workflow = AgenticServices.sequenceBuilder().subAgents(proposer, approval).outputKey("finalDecision").build();
+
+        return (String) workflow.invoke(Map.of("request", request));
+    }
+
 }
