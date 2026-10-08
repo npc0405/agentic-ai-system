@@ -147,7 +147,3 @@ Currently there is only a Spring context-load test. Note that it requires the `o
 - Local 14B models can be slow, so the client timeout is set to 5 minutes.
 - Output quality and structured-output reliability (`Review`, `Intent`) depend on the model used.
 - This is a demo: there is no authentication, rate limiting, or persistence.
-
-## License
-
-Add a license of your choice.
